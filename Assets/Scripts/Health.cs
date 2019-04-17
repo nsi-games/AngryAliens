@@ -1,62 +1,97 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace AngryAliens
+using System.Linq;
+
+[RequireComponent(typeof(SpriteRenderer))]
+[RequireComponent(typeof(Rigidbody2D))]
+public class Health : MonoBehaviour
 {
-    public class Health : MonoBehaviour
+    [System.Serializable]
+    public struct HealthSprite
     {
-        public float maxHealth = 100f;
-        public float damage = 50f;
-        public float painThreshold = 4f;
+        public Sprite sprite;
+        public float health;
+    }
 
-        public Sprite[] damageSprites;
-        public GameObject deathEffect;
-        public SpriteRenderer rend;
+    public float maxHealth = 100f;
+    public float damage = 25f; // How much damage to deal 
+    public float painThreshold = 4f; // Velocity to deal pain
 
-        private float health = 100f;
-        private int spriteIndex = 0;
+    public HealthSprite[] healthSprites;
+    
+    private float health = 0f;
+    private SpriteRenderer rend;
+    private Rigidbody2D rigid;
 
-        void OnCollisionEnter2D(Collision2D col)
+    void GetReferences()
+    {
+        rend = GetComponent<SpriteRenderer>();
+        rigid = GetComponent<Rigidbody2D>();
+    }
+
+    void Awake()
+    {
+        GetReferences();
+    }
+
+    void Start()
+    {
+        // Set health to max
+        health = maxHealth;
+        // Sort health list based on health
+        healthSprites = healthSprites.OrderBy(a => a.health).ToArray();
+    }
+
+    private void OnDrawGizmos()
+    {
+        GetReferences();
+        Gizmos.color = Color.blue;
+        Gizmos.DrawLine(transform.position, transform.position + (Vector3)rigid.velocity);
+
+        Gizmos.color = Color.red;
+        Gizmos.DrawLine(transform.position, transform.position + (Vector3)rigid.velocity.normalized);
+    }
+
+    void OnCollisionEnter2D(Collision2D info)
+    {
+        // Has the relative velocity reached the pain threshold?
+        if(info.relativeVelocity.magnitude > painThreshold)
         {
-            // Has the relative velocity reached the pain threshold?
-            if (col.relativeVelocity.magnitude > painThreshold)
+            // Deal damage with the script's stored damage
+            DealDamage(damage);
+        }
+    }
+
+    public Sprite GetHealthSprite(float health)
+    {
+        // Loop through all health sprites 
+        foreach (var healthSprite in healthSprites)
+        {
+            // Is helath less than current healthSprite?
+            if(health <= healthSprite.health)
             {
-                // Deal damage with the script's stored damage
-                DealDamage(damage);
+                // Return the sprite for that health
+                return healthSprite.sprite;
             }
         }
+        // Return nothing
+        return rend.sprite;
+    }
 
-        private void Start()
+    // Method for Dealing Damage to object (externally)
+    public void DealDamage(float damage)
+    {
+        // Reduce health by damage
+        health -= damage;
+        // Assign sprite based on health
+        rend.sprite = GetHealthSprite(health);
+        // If health is < 0
+        if (health <= 0)
         {
-            health = maxHealth;
-        }
-        private void Die()
-        {
-            // Spawn death effect (particles)
-            Instantiate(deathEffect, transform.position, Quaternion.identity);
-            // Destroy self
+            // Destroy object!
             Destroy(gameObject);
-        }
-
-        public void DealDamage(float damage)
-        {
-            // Reduce health by damage
-            health -= damage;
-
-            // Get percentage of health
-            float percentage = health / maxHealth;
-            // Use percentage to get index
-            spriteIndex = (int)Mathf.Lerp(0, damageSprites.Length, percentage);
-            // Update renderer's sprite to correspond with damage
-            rend.sprite = damageSprites[spriteIndex];
-
-            // Is there no more health?
-            if (health <= 0)
-            {
-                // Just die.
-                Die();
-            }
         }
     }
 }
